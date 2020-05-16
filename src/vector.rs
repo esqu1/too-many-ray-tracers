@@ -1,4 +1,5 @@
 use std::ops;
+use crate::color::Color;
 
 #[derive(Clone, Debug)]
 pub struct Vector {
@@ -61,6 +62,30 @@ impl ops::Sub for Vector {
     }
 }
 
+impl<'a, 'b> ops::Mul<&'b Vector> for &'a Vector {
+    type Output = Vector;
+
+    fn mul(self, other: &'b Vector) -> Vector {
+        Vector {
+            x: other.x * self.x,
+            y: other.y * self.y,
+            z: other.z * self.z,
+        }
+    }
+}
+
+impl ops::Mul<Vector> for Vector {
+    type Output = Self;
+
+    fn mul(self, other: Vector) -> Self {
+        Self {
+            x: other.x * self.x,
+            y: other.y * self.y,
+            z: other.z * self.z,
+        }
+    }
+}
+
 impl<'a> ops::Mul<f64> for &'a Vector {
     type Output = Vector;
 
@@ -109,9 +134,17 @@ impl Vector {
     pub fn normalize(&self) -> Self {
         self * (1.0 / self.norm())
     }
+
+    pub fn from_color(color: Color) -> Self {
+        Vector {
+            x: color.red as f64 / 255.0,
+            y: color.green as f64 / 255.0,
+            z: color.blue as f64 / 255.0,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Ray {
     pub origin: Vector,
     pub dir: Vector,
