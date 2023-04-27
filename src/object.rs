@@ -1,9 +1,11 @@
+use rand::random;
+
 use crate::color::Color;
 use crate::vector::Ray;
 use crate::vector::Vector;
 use std::f64::consts;
 
-const RAY_BOUNCE_DEPTH : usize = 50;
+const RAY_BOUNCE_DEPTH: usize = 50;
 
 pub struct DiffuseMaterial {
     pub color: Color,
@@ -11,9 +13,21 @@ pub struct DiffuseMaterial {
 
 pub struct MetalMaterial {
     pub attenuation: Color,
+    pub fuzz: f64,
+}
+
+// Based on snell's law, sin(theta) * eta = sin(theta') * eta'
+// One can prove that
+// R'_perp = eta_ratio * (R + cos(theta) * n) = eta_ratio * (R + (-R * n) * n)
+// R'_par = -sqrt(1 - abs(R'_perp)^2) * n
+pub struct DielectricMaterial {
+    pub eta_ratio: f64,
 }
 
 pub trait Material {
+    // Given an incident ray (with a point on the ray), and the surface normal,
+    // return a color contribution as well as a new reflected ray.
+    // TODO: refactor ray and t into a single Vector point.
     fn scatter(&self, ray: &Ray, normal: &Vector, t: f64) -> (Vector, Ray);
 }
 
@@ -26,11 +40,21 @@ pub fn random_in_unit_sphere() -> Vector {
     Vector::new(r * a.cos(), r * a.sin(), z)
 }
 
+pub fn reflect(ray: &Ray, normal: &Vector, t: f64) -> Ray {
+    Ray {
+        origin: ray.interpolate(t),
+        dir: ray.dir.clone() - normal * ray.dir.dot_ref(normal) * 2.0,
+    }
+}
+
 impl Material for DiffuseMaterial {
     fn scatter(&self, ray: &Ray, normal: &Vector, t: f64) -> (Vector, Ray) {
-        let sphere_center = &ray.interpolate(t) + normal;
-        let og_to_scattered = sphere_center + random_in_unit_sphere();
-        (Vector::from_color(self.color.clone()), Ray::from_pts(ray.interpolate(t), og_to_scattered - ray.interpolate(t)))
+        let lambertian_sphere_center = &ray.interpolate(t) + normal;
+        let og_to_scattered = lambertian_sphere_center + random_in_unit_sphere();
+        (
+            Vector::from_color(self.color.clone()),
+            Ray::from_pts(ray.interpolate(t), og_to_scattered - ray.interpolate(t)),
+        )
     }
 }
 
@@ -39,9 +63,31 @@ impl Material for MetalMaterial {
         let reflection = ray.interpolate(t) - normal * 2.0 * ray.interpolate(t).dot_ref(&normal);
         let r = Ray {
             origin: ray.interpolate(t),
-            dir: reflection,
+            dir: reflection + random_in_unit_sphere() * self.fuzz,
         };
         (Vector::from_color(self.attenuation.clone()), r)
+    }
+}
+
+impl Material for DielectricMaterial {
+    fn scatter(&self, ray: &Ray, normal: &Vector, t: f64) -> (Vector, Ray) {
+        let incident_point = ray.interpolate(t);
+        let norm_ray_dir = ray.dir.normalize();
+        let cos_theta = -norm_ray_dir.dot_ref(normal).min(1.0);
+        let sin_theta = (1.0 - cos_theta.powi(2)).sqrt();
+
+        let direction: Ray;
+        if self.eta_ratio * sin_theta > 1.0 {
+            direction = reflect(ray, normal, t);
+        } else {
+            let r_perp = (normal * cos_theta + norm_ray_dir.clone()) * self.eta_ratio;
+            let r_par = normal * (1.0 - r_perp.norm().powi(2)).sqrt() * -1.0;
+            direction = Ray {
+                origin: incident_point,
+                dir: (r_par + r_perp),
+            }
+        }
+        (Vector::from_color(Color::new(255, 255, 255)), direction)
     }
 }
 
@@ -110,7 +156,6 @@ impl World {
                 break;
             }
         }
-        
 
         let norm_ray_vec = ray.dir.normalize();
         let t = 0.5 * (norm_ray_vec.x + 1.0);

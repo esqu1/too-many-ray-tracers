@@ -24,7 +24,11 @@ impl Color {
     }
 
     pub fn from_vec_255(v: Vector) -> Self {
-        Self::new(v.x.abs() as u8, v.y.abs() as u8, v.z.abs() as u8)
+        Self::new(
+            v.x.clamp(0.0, 255.0) as u8,
+            v.y.clamp(0.0, 255.0) as u8,
+            v.z.clamp(0.0, 255.0) as u8,
+        )
     }
 
     pub fn white() -> Self {

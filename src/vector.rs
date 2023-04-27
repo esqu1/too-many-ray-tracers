@@ -1,7 +1,7 @@
-use std::ops;
 use crate::color::Color;
+use std::ops;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Vector {
     pub x: f64,
     pub y: f64,
@@ -140,6 +140,22 @@ impl Vector {
             x: color.red as f64 / 255.0,
             y: color.green as f64 / 255.0,
             z: color.blue as f64 / 255.0,
+        }
+    }
+
+    pub fn sqrt(&self) -> Self {
+        Self {
+            x: self.x.sqrt(),
+            y: self.y.sqrt(),
+            z: self.z.sqrt(),
+        }
+    }
+
+    pub fn cross(&self, other: &Vector) -> Self {
+        Self {
+            x: self.y * other.z - self.z * other.y,
+            y: self.z * other.x - self.x * other.z,
+            z: self.x * other.y - self.y * other.x,
         }
     }
 }
