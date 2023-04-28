@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 ndarray = "0.13.0"
 rand = "0.7.0"
+indicatif = "0.17.3"

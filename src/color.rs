@@ -3,7 +3,7 @@ use std::fmt;
 use std::ops;
 
 // Implements a RGB color. Values range from 0 to 255.
-#[derive(PartialEq, Clone, Default)]
+#[derive(PartialEq, Clone, Default, Debug)]
 pub struct Color {
     pub red: u8,
     pub green: u8,
@@ -37,6 +37,14 @@ impl Color {
 
     pub fn black() -> Self {
         Self::new(0, 0, 0)
+    }
+
+    pub fn random() -> Self {
+        Self::new(
+            rand::random::<u8>(),
+            rand::random::<u8>(),
+            rand::random::<u8>(),
+        )
     }
 }
 

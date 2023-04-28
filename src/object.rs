@@ -4,6 +4,7 @@ use crate::color::Color;
 use crate::vector::Ray;
 use crate::vector::Vector;
 use std::f64::consts;
+use std::sync::{Arc, Mutex};
 
 const RAY_BOUNCE_DEPTH: usize = 50;
 
@@ -27,17 +28,20 @@ pub struct DielectricMaterial {
 pub trait Material {
     // Given an incident ray (with a point on the ray), and the surface normal,
     // return a color contribution as well as a new reflected ray.
-    // TODO: refactor ray and t into a single Vector point.
     fn scatter(&self, ray: &Ray, normal: &Vector, t: f64) -> (Vector, Ray);
 }
 
 // Returns a random vector in the unit sphere according to the Lambertian distribution.
 pub fn random_in_unit_sphere() -> Vector {
     let rand_one_one = || 2.0 * rand::random::<f64>() - 1.0;
-    let a = rand::random::<f64>() * consts::PI;
-    let z = rand_one_one();
-    let r = (1.0 - z * z).sqrt();
-    Vector::new(r * a.cos(), r * a.sin(), z)
+    loop {
+        let x = rand_one_one();
+        let y = rand_one_one();
+        let z = rand_one_one();
+        if x.powi(2) + y.powi(2) + z.powi(2) < 1.0 {
+            return Vector::new(x, y, z).normalize();
+        }
+    }
 }
 
 pub fn reflect(ray: &Ray, normal: &Vector, t: f64) -> Ray {
@@ -49,21 +53,22 @@ pub fn reflect(ray: &Ray, normal: &Vector, t: f64) -> Ray {
 
 impl Material for DiffuseMaterial {
     fn scatter(&self, ray: &Ray, normal: &Vector, t: f64) -> (Vector, Ray) {
-        let lambertian_sphere_center = &ray.interpolate(t) + normal;
+        let intersection_point = ray.interpolate(t);
+        let lambertian_sphere_center = &intersection_point + normal;
         let og_to_scattered = lambertian_sphere_center + random_in_unit_sphere();
         (
             Vector::from_color(self.color.clone()),
-            Ray::from_pts(ray.interpolate(t), og_to_scattered - ray.interpolate(t)),
+            Ray::from_pts(intersection_point, og_to_scattered),
         )
     }
 }
 
 impl Material for MetalMaterial {
     fn scatter(&self, ray: &Ray, normal: &Vector, t: f64) -> (Vector, Ray) {
-        let reflection = ray.interpolate(t) - normal * 2.0 * ray.interpolate(t).dot_ref(&normal);
+        let reflected_ray = reflect(ray, normal, t);
         let r = Ray {
-            origin: ray.interpolate(t),
-            dir: reflection + random_in_unit_sphere() * self.fuzz,
+            origin: reflected_ray.origin,
+            dir: reflected_ray.dir + random_in_unit_sphere() * self.fuzz,
         };
         (Vector::from_color(self.attenuation.clone()), r)
     }
@@ -96,8 +101,8 @@ pub trait Shape {
 }
 
 pub struct Object {
-    pub material: Box<dyn Material>,
-    pub shape: Box<dyn Shape>,
+    pub material: Arc<dyn Material + Send + Sync>,
+    pub shape: Arc<dyn Shape + Send + Sync>,
 }
 
 pub struct Sphere {
@@ -135,7 +140,6 @@ pub struct World {
 
 impl World {
     pub fn color_at(&self, ray: &Ray) -> Vector {
-        // let mut mul_factor = 1.0;
         let mut j = 0;
         let mut r = ray.clone();
         let mut color = Vector::new(1.0, 1.0, 1.0);
@@ -144,11 +148,9 @@ impl World {
                 if t <= 0.001 {
                     break;
                 }
-                let pair = object.material.scatter(&r, &norm, t);
-                // println!("{}", t);
+                let pair = object.material.scatter(&r, &norm.normalize(), t);
                 let atten = pair.0;
                 r = pair.1.clone();
-                // println!("{:?}", r);
                 color = color * atten;
                 // mul_factor *= 0.5;
                 j += 1;
@@ -157,11 +159,15 @@ impl World {
             }
         }
 
+        if j == RAY_BOUNCE_DEPTH {
+            return Vector::new(0.0, 0.0, 0.0);
+        }
+
         let norm_ray_vec = ray.dir.normalize();
-        let t = 0.5 * (norm_ray_vec.x + 1.0);
-        let base = Vector::new(255.0, 255.0, 255.0) * (1.0 - t)
-            + Vector::new(255.0 * 0.5, 255.0 * 0.7, 255.0 * 1.0) * t;
-        color * base
+        let t = 0.5 * (norm_ray_vec.y + 1.0);
+        let base = Vector::new(1.0, 1.0, 1.0); //* (1.0 - t)
+                                               // + Vector::new(0.5, 0.7, 1.0) * t;
+        base * color
     }
 
     pub fn intersect(&self, ray: &Ray) -> Option<(f64, Vector, &Object)> {

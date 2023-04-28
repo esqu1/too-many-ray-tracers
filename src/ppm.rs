@@ -5,6 +5,7 @@ use std::io::prelude::*;
 use std::io::BufWriter;
 
 // An 8-bit ppm image format. Colors are integers ranging from 0 to 255.
+#[derive(Debug, Default)]
 pub struct PPM {
     length: usize,
     width: usize,
