@@ -1,10 +1,7 @@
-use rand::random;
-
 use crate::color::Color;
 use crate::vector::Ray;
 use crate::vector::Vector;
-use std::f64::consts;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 const RAY_BOUNCE_DEPTH: usize = 50;
 
@@ -85,7 +82,7 @@ impl Material for DielectricMaterial {
         if self.eta_ratio * sin_theta > 1.0 {
             direction = reflect(ray, normal, t);
         } else {
-            let r_perp = (normal * cos_theta + norm_ray_dir.clone()) * self.eta_ratio;
+            let r_perp = (normal * cos_theta + norm_ray_dir) * self.eta_ratio;
             let r_par = normal * (1.0 - r_perp.norm().powi(2)).sqrt() * -1.0;
             direction = Ray {
                 origin: incident_point,
@@ -127,7 +124,7 @@ impl Shape for Sphere {
         if disc >= 0.0 {
             let t = (-b - f64::sqrt(disc)) / (2.0 * a);
             let normal = (&ray.interpolate(t) - &self.center).normalize();
-            Some((t, normal.clone()))
+            Some((t, normal))
         } else {
             None
         }
@@ -150,7 +147,7 @@ impl World {
                 }
                 let pair = object.material.scatter(&r, &norm.normalize(), t);
                 let atten = pair.0;
-                r = pair.1.clone();
+                r = pair.1;
                 color = color * atten;
                 // mul_factor *= 0.5;
                 j += 1;
@@ -165,8 +162,7 @@ impl World {
 
         let norm_ray_vec = ray.dir.normalize();
         let t = 0.5 * (norm_ray_vec.y + 1.0);
-        let base = Vector::new(1.0, 1.0, 1.0); //* (1.0 - t)
-                                               // + Vector::new(0.5, 0.7, 1.0) * t;
+        let base = Vector::new(1.0, 1.0, 1.0) * (1.0 - t) + Vector::new(0.5, 0.7, 1.0) * t;
         base * color
     }
 

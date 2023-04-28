@@ -9,14 +9,13 @@ use camera::Camera;
 use color::Color;
 use object::*;
 use ppm::PPM;
-use rand::random;
 use std::sync::{Arc, Mutex};
-use vector::Vector;
+use vector::{Vector, ORIGIN};
 fn main() {
     let aspect_ratio = 16.0 / 9.0;
-    let img_length = 1200;
+    let img_length = 450;
     let origin = Vector::new(13.0, 2.0, 3.0);
-    let lookat = Vector::new(0.0, 0.0, 0.0);
+    let lookat = ORIGIN;
     let focus_dist = 10.0;
     let mut camera = Camera::new(
         Arc::new(Mutex::new(PPM::new(
@@ -110,6 +109,6 @@ fn main() {
         .img
         .lock()
         .unwrap()
-        .write_to_file(String::from("basicsphere.ppm"))
+        .write_to_file(String::from("test.ppm"))
         .expect("I/O error during write");
 }

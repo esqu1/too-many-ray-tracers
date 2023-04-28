@@ -1,5 +1,4 @@
 use crate::color::Color;
-use ndarray::Array3;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::io::BufWriter;
@@ -37,24 +36,6 @@ impl PPM {
         &mut self.pixels
     }
 
-    pub fn grid_position(&self, index: &usize) -> Option<(usize, usize)> {
-        if *index >= self.get_length() * self.get_width() {
-            None
-        } else {
-            Some((index / self.get_width(), index % self.get_width()))
-        }
-    }
-
-    pub fn get_pixel_matrix(&self) -> Array3<u8> {
-        let mut matrix = Array3::<u8>::zeros((3, self.get_length(), self.get_width()));
-        for (i, pixel) in self.get_pixel_vector().iter().enumerate() {
-            let (row, col) = self.grid_position(&i).unwrap();
-            matrix[[0, row, col]] = pixel.red;
-            matrix[[1, row, col]] = pixel.green;
-            matrix[[2, row, col]] = pixel.blue;
-        }
-        matrix
-    }
     pub fn set_pixel(&mut self, pixel: Color, row: usize, col: usize) {
         let index = row * self.get_width() + col;
         self.get_pixel_vector_mut()[index] = pixel;

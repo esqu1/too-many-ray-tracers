@@ -3,18 +3,14 @@ use crate::object::*;
 use crate::ppm::PPM;
 use crate::vector::Ray;
 use crate::vector::Vector;
-use crate::vector::ORIGIN;
-use core::num;
 use indicatif::ProgressBar;
 use rand;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 
-const NUM_SAMPLES: usize = 500;
-
-const FOCAL_LENGTH: f64 = 1.0;
-const NUM_THREADS: usize = 8;
+const NUM_SAMPLES: usize = 100;
+const NUM_THREADS: usize = 6;
 
 #[derive(Default, Debug)]
 pub struct Camera {
@@ -128,7 +124,7 @@ impl Camera {
                     img_ptr
                         .lock()
                         .unwrap()
-                        .set_pixel(Color::from_vec(acc.clone()), row, col);
+                        .set_pixel(Color::from_vec(acc), row, col);
 
                     bar_ptr.inc(1);
                     j += 1;
