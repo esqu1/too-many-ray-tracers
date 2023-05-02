@@ -1,6 +1,6 @@
 use crate::color::Color;
 use crate::ppm::PPM;
-use crate::vector::Vector;
+use crate::vector::Vec3f;
 use std::collections::HashMap;
 
 pub struct Rasterizer {
@@ -13,11 +13,11 @@ impl Rasterizer {
             fragments: HashMap::new(),
         }
     }
-    pub fn triangle(&mut self, p1: Vector, p2: Vector, p3: Vector, color: Color) {
+    pub fn triangle(&mut self, p1: Vec3f, p2: Vec3f, p3: Vec3f, color: Color) {
         // icky, messy code. TODO: clean up
-        let top_most: &Vector;
-        let middle_pt: &Vector;
-        let bottom_pt: &Vector;
+        let top_most: &Vec3f;
+        let middle_pt: &Vec3f;
+        let bottom_pt: &Vec3f;
         if p1.y < p2.y && p1.y < p3.y {
             top_most = &p1;
             if p2.y < p3.y {
@@ -108,7 +108,7 @@ impl Rasterizer {
         }
     }
 
-    pub fn set_camera(&self, origin: Vector, lookat: Vector, up: Vector) {
+    pub fn set_camera(&self, origin: Vec3f, lookat: Vec3f, up: Vec3f) {
         todo!();
     }
 }

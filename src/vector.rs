@@ -2,23 +2,23 @@ use crate::color::Color;
 use std::ops;
 
 #[derive(Clone, Debug, Default)]
-pub struct Vector {
+pub struct Vec3f {
     pub x: f64,
     pub y: f64,
     pub z: f64,
 }
 
-pub const ORIGIN: Vector = Vector {
+pub const ORIGIN: Vec3f = Vec3f {
     x: 0.0,
     y: 0.0,
     z: 0.0,
 };
 
-impl<'a, 'b> ops::Add<&'b Vector> for &'a Vector {
-    type Output = Vector;
+impl<'a, 'b> ops::Add<&'b Vec3f> for &'a Vec3f {
+    type Output = Vec3f;
 
-    fn add(self, other: &'b Vector) -> Vector {
-        Vector {
+    fn add(self, other: &'b Vec3f) -> Vec3f {
+        Vec3f {
             x: self.x + other.x,
             y: self.y + other.y,
             z: self.z + other.z,
@@ -26,7 +26,7 @@ impl<'a, 'b> ops::Add<&'b Vector> for &'a Vector {
     }
 }
 
-impl ops::Add for Vector {
+impl ops::Add for Vec3f {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
@@ -38,11 +38,11 @@ impl ops::Add for Vector {
     }
 }
 
-impl<'a, 'b> ops::Sub<&'b Vector> for &'a Vector {
-    type Output = Vector;
+impl<'a, 'b> ops::Sub<&'b Vec3f> for &'a Vec3f {
+    type Output = Vec3f;
 
-    fn sub(self, other: &'b Vector) -> Vector {
-        Vector {
+    fn sub(self, other: &'b Vec3f) -> Vec3f {
+        Vec3f {
             x: self.x - other.x,
             y: self.y - other.y,
             z: self.z - other.z,
@@ -50,7 +50,7 @@ impl<'a, 'b> ops::Sub<&'b Vector> for &'a Vector {
     }
 }
 
-impl ops::Sub for Vector {
+impl ops::Sub for Vec3f {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
@@ -62,11 +62,11 @@ impl ops::Sub for Vector {
     }
 }
 
-impl<'a, 'b> ops::Mul<&'b Vector> for &'a Vector {
-    type Output = Vector;
+impl<'a, 'b> ops::Mul<&'b Vec3f> for &'a Vec3f {
+    type Output = Vec3f;
 
-    fn mul(self, other: &'b Vector) -> Vector {
-        Vector {
+    fn mul(self, other: &'b Vec3f) -> Vec3f {
+        Vec3f {
             x: other.x * self.x,
             y: other.y * self.y,
             z: other.z * self.z,
@@ -74,10 +74,10 @@ impl<'a, 'b> ops::Mul<&'b Vector> for &'a Vector {
     }
 }
 
-impl ops::Mul<Vector> for Vector {
+impl ops::Mul<Vec3f> for Vec3f {
     type Output = Self;
 
-    fn mul(self, other: Vector) -> Self {
+    fn mul(self, other: Vec3f) -> Self {
         Self {
             x: other.x * self.x,
             y: other.y * self.y,
@@ -86,11 +86,11 @@ impl ops::Mul<Vector> for Vector {
     }
 }
 
-impl<'a> ops::Mul<f64> for &'a Vector {
-    type Output = Vector;
+impl<'a> ops::Mul<f64> for &'a Vec3f {
+    type Output = Vec3f;
 
-    fn mul(self, other: f64) -> Vector {
-        Vector {
+    fn mul(self, other: f64) -> Vec3f {
+        Vec3f {
             x: other * self.x,
             y: other * self.y,
             z: other * self.z,
@@ -98,7 +98,7 @@ impl<'a> ops::Mul<f64> for &'a Vector {
     }
 }
 
-impl ops::Mul<f64> for Vector {
+impl ops::Mul<f64> for Vec3f {
     type Output = Self;
 
     fn mul(self, other: f64) -> Self {
@@ -110,16 +110,16 @@ impl ops::Mul<f64> for Vector {
     }
 }
 
-impl Vector {
+impl Vec3f {
     pub fn new(x: f64, y: f64, z: f64) -> Self {
         Self { x, y, z }
     }
 
-    pub fn dot(self, other: Vector) -> f64 {
+    pub fn dot(self, other: Vec3f) -> f64 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
-    pub fn dot_ref(&self, other: &Vector) -> f64 {
+    pub fn dot_ref(&self, other: &Vec3f) -> f64 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
@@ -136,7 +136,7 @@ impl Vector {
     }
 
     pub fn from_color(color: Color) -> Self {
-        Vector {
+        Vec3f {
             x: color.red as f64 / 255.0,
             y: color.green as f64 / 255.0,
             z: color.blue as f64 / 255.0,
@@ -151,7 +151,7 @@ impl Vector {
         }
     }
 
-    pub fn cross(&self, other: &Vector) -> Self {
+    pub fn cross(&self, other: &Vec3f) -> Self {
         Self {
             x: self.y * other.z - self.z * other.y,
             y: self.z * other.x - self.x * other.z,
@@ -162,17 +162,17 @@ impl Vector {
 
 #[derive(Debug, Clone)]
 pub struct Ray {
-    pub origin: Vector,
-    pub dir: Vector,
+    pub origin: Vec3f,
+    pub dir: Vec3f,
 }
 
 impl Ray {
-    pub fn interpolate(&self, t: f64) -> Vector {
+    pub fn interpolate(&self, t: f64) -> Vec3f {
         let d = &self.dir * t;
         &d + &self.origin
     }
 
-    pub fn from_pts(v1: Vector, v2: Vector) -> Self {
+    pub fn from_pts(v1: Vec3f, v2: Vec3f) -> Self {
         // v1 -> v2
         Self {
             origin: v1.clone(),

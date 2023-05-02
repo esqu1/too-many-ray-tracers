@@ -1,6 +1,6 @@
 use crate::color::Color;
 use crate::vector::Ray;
-use crate::vector::Vector;
+use crate::vector::Vec3f;
 use std::sync::Arc;
 
 const RAY_BOUNCE_DEPTH: usize = 50;
@@ -25,23 +25,23 @@ pub struct DielectricMaterial {
 pub trait Material {
     // Given an incident ray (with a point on the ray), and the surface normal,
     // return a color contribution as well as a new reflected ray.
-    fn scatter(&self, ray: &Ray, normal: &Vector, t: f64) -> (Vector, Ray);
+    fn scatter(&self, ray: &Ray, normal: &Vec3f, t: f64) -> (Vec3f, Ray);
 }
 
 // Returns a random vector in the unit sphere according to the Lambertian distribution.
-pub fn random_in_unit_sphere() -> Vector {
+pub fn random_in_unit_sphere() -> Vec3f {
     let rand_one_one = || 2.0 * rand::random::<f64>() - 1.0;
     loop {
         let x = rand_one_one();
         let y = rand_one_one();
         let z = rand_one_one();
         if x.powi(2) + y.powi(2) + z.powi(2) < 1.0 {
-            return Vector::new(x, y, z).normalize();
+            return Vec3f::new(x, y, z).normalize();
         }
     }
 }
 
-pub fn reflect(ray: &Ray, normal: &Vector, t: f64) -> Ray {
+pub fn reflect(ray: &Ray, normal: &Vec3f, t: f64) -> Ray {
     Ray {
         origin: ray.interpolate(t),
         dir: ray.dir.clone() - normal * ray.dir.dot_ref(normal) * 2.0,
@@ -49,30 +49,30 @@ pub fn reflect(ray: &Ray, normal: &Vector, t: f64) -> Ray {
 }
 
 impl Material for DiffuseMaterial {
-    fn scatter(&self, ray: &Ray, normal: &Vector, t: f64) -> (Vector, Ray) {
+    fn scatter(&self, ray: &Ray, normal: &Vec3f, t: f64) -> (Vec3f, Ray) {
         let intersection_point = ray.interpolate(t);
         let lambertian_sphere_center = &intersection_point + normal;
         let og_to_scattered = lambertian_sphere_center + random_in_unit_sphere();
         (
-            Vector::from_color(self.color.clone()),
+            Vec3f::from_color(self.color.clone()),
             Ray::from_pts(intersection_point, og_to_scattered),
         )
     }
 }
 
 impl Material for MetalMaterial {
-    fn scatter(&self, ray: &Ray, normal: &Vector, t: f64) -> (Vector, Ray) {
+    fn scatter(&self, ray: &Ray, normal: &Vec3f, t: f64) -> (Vec3f, Ray) {
         let reflected_ray = reflect(ray, normal, t);
         let r = Ray {
             origin: reflected_ray.origin,
             dir: reflected_ray.dir + random_in_unit_sphere() * self.fuzz,
         };
-        (Vector::from_color(self.attenuation.clone()), r)
+        (Vec3f::from_color(self.attenuation.clone()), r)
     }
 }
 
 impl Material for DielectricMaterial {
-    fn scatter(&self, ray: &Ray, normal: &Vector, t: f64) -> (Vector, Ray) {
+    fn scatter(&self, ray: &Ray, normal: &Vec3f, t: f64) -> (Vec3f, Ray) {
         let incident_point = ray.interpolate(t);
         let norm_ray_dir = ray.dir.normalize();
         let cos_theta = -norm_ray_dir.dot_ref(normal).min(1.0);
@@ -89,12 +89,12 @@ impl Material for DielectricMaterial {
                 dir: (r_par + r_perp),
             }
         }
-        (Vector::from_color(Color::new(255, 255, 255)), direction)
+        (Vec3f::from_color(Color::new(255, 255, 255)), direction)
     }
 }
 
 pub trait Shape {
-    fn intersect(&self, ray: &Ray) -> Option<(f64, Vector)>;
+    fn intersect(&self, ray: &Ray) -> Option<(f64, Vec3f)>;
 }
 
 pub struct Object {
@@ -103,7 +103,7 @@ pub struct Object {
 }
 
 pub struct Sphere {
-    pub center: Vector,
+    pub center: Vec3f,
     pub radius: f64,
 }
 
@@ -114,7 +114,7 @@ pub struct Sphere {
 // -> (o-c)^2 - (o^2 + c^2 - 2oc - r^2)
 // -> r^2 - 4oc
 impl Shape for Sphere {
-    fn intersect(&self, ray: &Ray) -> Option<(f64, Vector)> {
+    fn intersect(&self, ray: &Ray) -> Option<(f64, Vec3f)> {
         let a = ray.dir.sq_norm();
         let b = (ray.dir.dot_ref(&(&ray.origin - &self.center))) * 2.0;
         let c = ray.origin.sq_norm() + self.center.sq_norm()
@@ -136,10 +136,10 @@ pub struct World {
 }
 
 impl World {
-    pub fn color_at(&self, ray: &Ray) -> Vector {
+    pub fn color_at(&self, ray: &Ray) -> Vec3f {
         let mut j = 0;
         let mut r = ray.clone();
-        let mut color = Vector::new(1.0, 1.0, 1.0);
+        let mut color = Vec3f::new(1.0, 1.0, 1.0);
         while j < RAY_BOUNCE_DEPTH {
             if let Some((t, norm, object)) = self.intersect(&r) {
                 if t <= 0.001 {
@@ -157,16 +157,16 @@ impl World {
         }
 
         if j == RAY_BOUNCE_DEPTH {
-            return Vector::new(0.0, 0.0, 0.0);
+            return Vec3f::new(0.0, 0.0, 0.0);
         }
 
         let norm_ray_vec = ray.dir.normalize();
         let t = 0.5 * (norm_ray_vec.y + 1.0);
-        let base = Vector::new(1.0, 1.0, 1.0) * (1.0 - t) + Vector::new(0.5, 0.7, 1.0) * t;
+        let base = Vec3f::new(1.0, 1.0, 1.0) * (1.0 - t) + Vec3f::new(0.5, 0.7, 1.0) * t;
         base * color
     }
 
-    pub fn intersect(&self, ray: &Ray) -> Option<(f64, Vector, &Object)> {
+    pub fn intersect(&self, ray: &Ray) -> Option<(f64, Vec3f, &Object)> {
         self.objects.iter().fold(None, |acc, obj| {
             if let Some((t1, n1)) = obj.shape.intersect(&ray) {
                 if t1 < 0.001 {

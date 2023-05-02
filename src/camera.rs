@@ -2,7 +2,7 @@ use crate::color::Color;
 use crate::object::*;
 use crate::ppm::PPM;
 use crate::vector::Ray;
-use crate::vector::Vector;
+use crate::vector::Vec3f;
 use indicatif::ProgressBar;
 use rand;
 use std::sync::{Arc, Mutex};
@@ -16,18 +16,18 @@ const NUM_THREADS: usize = 6;
 pub struct Camera {
     pub img: Arc<Mutex<PPM>>,
     // A point representing the camera origin.
-    pub origin: Vector,
+    pub origin: Vec3f,
     // A vector representing dir that the camera is pointing.
-    pub lookat: Vector,
+    pub lookat: Vec3f,
     // A vector representing the direction that is "up" within the plane of the camera.
-    pub v_up: Vector,
+    pub v_up: Vec3f,
     pub vfov: f64, // in degrees
     pub focus_dist: f64,
     pub aperture: f64,
 
-    pub lower_left_corner: Vector,
-    pub horizontal: Vector,
-    pub vertical: Vector,
+    pub lower_left_corner: Vec3f,
+    pub horizontal: Vec3f,
+    pub vertical: Vec3f,
 }
 
 // .--- x (width) --->
@@ -40,9 +40,9 @@ pub struct Camera {
 impl Camera {
     pub fn new(
         img: Arc<Mutex<PPM>>,
-        origin: Vector,
-        lookat: Vector,
-        v_up: Vector,
+        origin: Vec3f,
+        lookat: Vec3f,
+        v_up: Vec3f,
         vfov: f64,
         focus_dist: f64,
         aperture: f64,
@@ -109,7 +109,7 @@ impl Camera {
                     let pixel_val = j * NUM_THREADS + i;
                     let row = pixel_val / width;
                     let col = pixel_val % width;
-                    let mut acc = Vector::new(0.0, 0.0, 0.0);
+                    let mut acc = Vec3f::new(0.0, 0.0, 0.0);
                     // sample multiple times for anti-aliasing
                     for _ in 0..NUM_SAMPLES {
                         let pass_through_camera_point = lower_left_corner.clone()

@@ -1,4 +1,4 @@
-use crate::vector::Vector;
+use crate::vector::Vec3f;
 use std::fmt;
 use std::ops;
 
@@ -15,7 +15,7 @@ impl Color {
         Color { red, green, blue }
     }
 
-    pub fn from_vec(v: Vector) -> Self {
+    pub fn from_vec(v: Vec3f) -> Self {
         Self::new(
             (v.x.abs() * 255.0) as u8,
             (v.y.abs() * 255.0) as u8,
@@ -23,7 +23,7 @@ impl Color {
         )
     }
 
-    pub fn from_vec_255(v: Vector) -> Self {
+    pub fn from_vec_255(v: Vec3f) -> Self {
         Self::new(
             v.x.clamp(0.0, 255.0) as u8,
             v.y.clamp(0.0, 255.0) as u8,
