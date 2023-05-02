@@ -1,10 +1,14 @@
 use crate::color::Color;
 use crate::ppm::PPM;
-use crate::vector::Vec3f;
+use crate::vector::{Vec3f, Vec3i};
 use std::collections::HashMap;
 
+pub fn interpolate(starting: f64, ending: f64, t: f64) -> f64 {
+    ending * t + (1.0 - t) * starting
+}
+
 pub struct Rasterizer {
-    fragments: HashMap<(usize, usize), Vec<Color>>,
+    fragments: HashMap<(usize, usize), Vec<(Color, f64)>>,
 }
 
 impl Rasterizer {
@@ -56,11 +60,16 @@ impl Rasterizer {
                 / (top_most.y - middle_pt.y)
                 + middle_pt.x;
 
+            let t1 = (i as f64 - top_most.y) / (bottom_pt.y - top_most.y);
+            let t2 = (i as f64 - top_most.y) / (middle_pt.y - top_most.y);
+
             self.line(
-                starting_x as usize,
-                i as usize,
-                ending_x as usize,
-                i as usize,
+                Vec3f::new(
+                    starting_x,
+                    i as f64,
+                    interpolate(top_most.z, bottom_pt.z, t1),
+                ),
+                Vec3f::new(ending_x, i as f64, interpolate(top_most.z, middle_pt.z, t2)),
                 color.clone(),
             );
 
@@ -74,11 +83,20 @@ impl Rasterizer {
                 / (bottom_pt.y - middle_pt.y)
                 + middle_pt.x;
 
+            let t1 = (i as f64 - top_most.y) / (bottom_pt.y - top_most.y);
+            let t2 = (i as f64 - middle_pt.y) / (bottom_pt.y - middle_pt.y);
+
             self.line(
-                starting_x as usize,
-                i as usize,
-                ending_x as usize,
-                i as usize,
+                Vec3f::new(
+                    starting_x,
+                    i as f64,
+                    interpolate(top_most.z, bottom_pt.z, t1),
+                ),
+                Vec3f::new(
+                    ending_x,
+                    i as f64,
+                    interpolate(middle_pt.z, bottom_pt.z, t2),
+                ),
                 color.clone(),
             );
 
@@ -86,25 +104,36 @@ impl Rasterizer {
         }
     }
 
-    pub fn line(&mut self, p1x: usize, p1y: usize, p2x: usize, p2y: usize, color: Color) {
+    pub fn line(&mut self, p1: Vec3f, p2: Vec3f, color: Color) {
         // Implementation of naive line drawing algorithm
-        let slope = (p2y - p1y) as f64 / (p2x - p1x) as f64;
-        let mut i: i32 = p1x as i32;
-        let dx: i32 = if p2x > p1x { 1 } else { -1 };
-        while i != p2x as i32 {
-            let j = slope * (i - p1x as i32) as f64 + p1y as f64;
+        let slope = (p2.y - p1.y) as f64 / (p2.x - p1.x) as f64;
+        let mut i: i32 = p1.x as i32;
+        let dx: i32 = if p2.x > p1.x { 1 } else { -1 };
+        while i != p2.x as i32 {
+            let j = slope * (i - p1.x as i32) as f64 + p1.y as f64;
             let existing_fragments = self
                 .fragments
                 .entry((i as usize, j as usize))
                 .or_insert(vec![]);
-            existing_fragments.push(color.clone());
+            existing_fragments.push((
+                color.clone(),
+                interpolate(p1.z, p2.z, (i as f64 - p1.x) / (p2.x - p1.x)),
+            ));
             i += dx;
         }
     }
 
     pub fn write_to_ppm(&self, ppm: &mut PPM) {
         for fragment in self.fragments.iter() {
-            ppm.set_pixel(fragment.1[0].clone(), fragment.0 .1, fragment.0 .0);
+            let min_fragment = fragment
+                .1
+                .iter()
+                .min_by(|f1, f2| f2.1.partial_cmp(&f1.1).unwrap());
+            ppm.set_pixel(
+                min_fragment.unwrap().0.clone(),
+                fragment.0 .1,
+                fragment.0 .0,
+            );
         }
     }
 

@@ -1,12 +1,17 @@
 use crate::color::Color;
+use num_traits::Num;
 use std::ops;
 
 #[derive(Clone, Debug, Default)]
-pub struct Vec3f {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
+
+pub struct Vector<T: Num + Copy> {
+    pub x: T,
+    pub y: T,
+    pub z: T,
 }
+
+pub type Vec3f = Vector<f64>;
+pub type Vec3i = Vector<i32>;
 
 pub const ORIGIN: Vec3f = Vec3f {
     x: 0.0,
@@ -110,19 +115,21 @@ impl ops::Mul<f64> for Vec3f {
     }
 }
 
-impl Vec3f {
-    pub fn new(x: f64, y: f64, z: f64) -> Self {
+impl<T: Num + Copy> Vector<T> {
+    pub fn new(x: T, y: T, z: T) -> Self {
         Self { x, y, z }
     }
 
-    pub fn dot(self, other: Vec3f) -> f64 {
+    pub fn dot(self, other: Vector<T>) -> T {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
-    pub fn dot_ref(&self, other: &Vec3f) -> f64 {
+    pub fn dot_ref(&self, other: &Vector<T>) -> T {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
+}
 
+impl Vec3f {
     pub fn norm(&self) -> f64 {
         f64::sqrt(self.x * self.x + self.y * self.y + self.z * self.z)
     }

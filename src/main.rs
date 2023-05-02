@@ -1,4 +1,5 @@
 #![feature(mutex_unlock)]
+#![feature(trait_alias)]
 
 mod camera;
 mod color;
@@ -23,10 +24,16 @@ fn rasterize() {
 
     // rasterizer.line(200, 200, 100, 200);
     rasterizer.triangle(
-        Vec3f::new(100.0, 100.0, 0.0),
-        Vec3f::new(200.0, 150.0, 0.0),
-        Vec3f::new(100.0, 200.0, 0.0),
+        Vec3f::new(100.0, 100.0, 2.0),
+        Vec3f::new(200.0, 150.0, 2.0),
+        Vec3f::new(100.0, 200.0, 2.0),
         Color::new(0, 0, 125),
+    );
+    rasterizer.triangle(
+        Vec3f::new(120.0, 100.0, 4.0),
+        Vec3f::new(220.0, 150.0, 4.0),
+        Vec3f::new(120.0, 200.0, 4.0),
+        Color::new(0, 255, 0),
     );
 
     rasterizer.write_to_ppm(&mut ppm);
