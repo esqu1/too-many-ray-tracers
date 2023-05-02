@@ -4,14 +4,37 @@ mod camera;
 mod color;
 mod object;
 mod ppm;
+mod rasterizer;
 mod vector;
 use camera::Camera;
 use color::Color;
 use object::*;
 use ppm::PPM;
+use rasterizer::Rasterizer;
 use std::sync::{Arc, Mutex};
 use vector::{Vector, ORIGIN};
-fn main() {
+
+fn rasterize() {
+    let aspect_ratio = 16.0 / 9.0;
+    let img_length = 450;
+    let mut ppm = PPM::new(img_length, (img_length as f64 * aspect_ratio) as usize);
+
+    let mut rasterizer = Rasterizer::new();
+
+    // rasterizer.line(200, 200, 100, 200);
+    rasterizer.triangle(
+        Vector::new(100.0, 100.0, 0.0),
+        Vector::new(200.0, 150.0, 0.0),
+        Vector::new(100.0, 200.0, 0.0),
+        Color::new(0, 0, 125),
+    );
+
+    rasterizer.write_to_ppm(&mut ppm);
+
+    ppm.write_to_file(String::from("rasterized.ppm"));
+}
+
+fn raytrace() {
     let aspect_ratio = 16.0 / 9.0;
     let img_length = 450;
     let origin = Vector::new(13.0, 2.0, 3.0);
@@ -111,4 +134,8 @@ fn main() {
         .unwrap()
         .write_to_file(String::from("test.ppm"))
         .expect("I/O error during write");
+}
+
+fn main() {
+    rasterize();
 }
