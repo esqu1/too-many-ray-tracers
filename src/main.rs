@@ -1,4 +1,3 @@
-#![feature(mutex_unlock)]
 #![feature(trait_alias)]
 
 mod camera;
@@ -8,12 +7,19 @@ mod ppm;
 mod rasterizer;
 mod vector;
 use camera::Camera;
+use clap::Parser;
 use color::Color;
 use object::*;
 use ppm::PPM;
 use rasterizer::Rasterizer;
 use std::sync::{Arc, Mutex};
 use vector::{Vec3f, ORIGIN};
+
+#[derive(Parser)]
+struct Args {
+    #[arg(short, long)]
+    method: String,
+}
 
 fn rasterize() {
     let aspect_ratio = 16.0 / 9.0;
@@ -144,5 +150,10 @@ fn raytrace() {
 }
 
 fn main() {
-    rasterize();
+    let args = Args::parse();
+    match args.method.as_str() {
+        "raytracer" => raytrace(),
+        "rasterizer" => rasterize(),
+        _ => println!("Unknown method provided. Available options are raytracer and rasterizer."),
+    }
 }

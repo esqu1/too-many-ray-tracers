@@ -57,12 +57,14 @@ impl Camera {
             aperture,
             ..Default::default()
         };
+        let length: usize;
+        let width: usize;
+        {
+            let img_lock = camera.img.lock().unwrap();
+            length = img_lock.get_length();
+            width = img_lock.get_width();
+        }
 
-        let img_lock = camera.img.lock().unwrap();
-        let length = img_lock.get_length();
-        let width = img_lock.get_width();
-
-        Mutex::unlock(img_lock);
         let aspect_ratio = width as f64 / length as f64;
 
         let w = (&camera.origin - &camera.lookat).normalize();
@@ -83,11 +85,13 @@ impl Camera {
     }
 
     pub fn write_ppm(&mut self, world: Arc<World>) {
-        let img_lock = self.img.lock().unwrap();
-        let length = img_lock.get_length();
-        let width = img_lock.get_width();
-
-        Mutex::unlock(img_lock);
+        let length: usize;
+        let width: usize;
+        {
+            let img_lock = self.img.lock().unwrap();
+            length = img_lock.get_length();
+            width = img_lock.get_width();
+        }
 
         let bar = Arc::new(ProgressBar::new(length as u64 * width as u64));
 
