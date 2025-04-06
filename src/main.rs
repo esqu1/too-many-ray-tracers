@@ -34,6 +34,12 @@ struct Args {
 
     #[arg(long)]
     num_threads: Option<usize>,
+
+    #[arg(short, long)]
+    width: Option<usize>,
+
+    #[arg(long)]
+    samples_per_pixel: Option<usize>,
 }
 
 struct App {
@@ -163,10 +169,10 @@ fn rasterize() {
     ppm.write_to_file(String::from("rasterized.ppm")).unwrap();
 }
 
-fn raytrace(num_threads: Option<usize>) {
+fn raytrace(args: Args) {
     let aspect_ratio = 16.0 / 9.0;
-    let img_height = 450;
-    let img_width = (img_height as f64 * aspect_ratio) as usize;
+    let img_width = args.width.unwrap_or(1920);
+    let img_height = (img_width as f64 / aspect_ratio) as usize;
     let origin = Vec3f::new(13.0, 2.0, 3.0);
     let lookat = ORIGIN;
     let camera = Camera::new(
@@ -176,6 +182,7 @@ fn raytrace(num_threads: Option<usize>) {
         lookat,
         Vec3f::new(0.0, -1.0, 0.0),
         40.0,
+        args.samples_per_pixel.unwrap_or(100),
     );
 
     let mut objects: Vec<Object> = vec![];
@@ -213,7 +220,7 @@ fn raytrace(num_threads: Option<usize>) {
                             color: random_color,
                         }),
                     })
-                } else if material_seed < 0.95 {
+                } else if material_seed < 0.9 {
                     let fuzz = rand::random::<f64>();
                     objects.push(Object {
                         shape: sphere,
@@ -221,6 +228,11 @@ fn raytrace(num_threads: Option<usize>) {
                             attenuation: Color::random(),
                             fuzz,
                         }),
+                    })
+                } else {
+                    objects.push(Object {
+                        shape: sphere,
+                        material: Arc::new(DielectricMaterial { eta_ratio: 0.5 }),
                     })
                 }
             }
@@ -239,6 +251,14 @@ fn raytrace(num_threads: Option<usize>) {
 
     objects.push(Object {
         shape: Arc::new(Sphere {
+            center: Vec3f::new(0.0, 1.0, 0.0),
+            radius: 1.0,
+        }),
+        material: Arc::new(DielectricMaterial { eta_ratio: 0.5 }),
+    });
+
+    objects.push(Object {
+        shape: Arc::new(Sphere {
             center: Vec3f::new(4.0, 1.0, 0.0),
             radius: 1.0,
         }),
@@ -250,14 +270,14 @@ fn raytrace(num_threads: Option<usize>) {
     let world = Arc::new(World { objects });
 
     let event_loop: EventLoop<()> = EventLoop::new().unwrap();
-    let mut app = App::new((img_width, img_height), camera, world, num_threads);
+    let mut app = App::new((img_width, img_height), camera, world, args.num_threads);
     event_loop.run_app(&mut app).unwrap();
 }
 
 fn main() {
     let args = Args::parse();
     match args.method.as_str() {
-        "raytracer" => raytrace(args.num_threads),
+        "raytracer" => raytrace(args),
         "rasterizer" => rasterize(),
         _ => println!("Unknown method provided. Available options are raytracer and rasterizer."),
     }

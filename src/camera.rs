@@ -11,7 +11,6 @@ use std::thread;
 use std::thread::ScopedJoinHandle;
 use winit::window::Window;
 
-const NUM_SAMPLES: usize = 100;
 const DEFAULT_NUM_THREADS: usize = 6;
 
 #[derive(Default, Debug)]
@@ -25,7 +24,7 @@ pub struct Camera {
     // A vector representing the direction that is "up" within the plane of the camera.
     pub v_up: Vec3f,
     pub vfov: f64, // in degrees
-
+    pub samples_per_pixel: usize,
     pub lower_left_corner: Vec3f,
     pub horizontal: Vec3f,
     pub vertical: Vec3f,
@@ -46,6 +45,7 @@ impl Camera {
         lookat: Vec3f,
         v_up: Vec3f,
         vfov: f64,
+        samples_per_pixel: usize,
     ) -> Self {
         let mut camera = Self {
             width,
@@ -54,6 +54,7 @@ impl Camera {
             lookat,
             v_up,
             vfov,
+            samples_per_pixel,
             ..Default::default()
         };
 
@@ -132,6 +133,7 @@ impl Camera {
                 let write_pixel_fn_clone = write_pixel_fn.clone();
                 let width = self.width;
                 let height = self.height;
+                let samples_per_pixel = self.samples_per_pixel;
                 handles.push(s.spawn(move || {
                     let mut j = 0;
                     while j * DEFAULT_NUM_THREADS + i < total_pixels {
@@ -140,7 +142,7 @@ impl Camera {
                         let col = pixel_val % width;
                         let mut acc = Vec3f::new(0.0, 0.0, 0.0);
                         // sample multiple times for anti-aliasing
-                        for _ in 0..NUM_SAMPLES {
+                        for _ in 0..samples_per_pixel {
                             let pass_through_camera_point = lower_left_corner.clone()
                                 + (&horizontal
                                     * ((col as f64 + rand::random::<f64>()) / width as f64))
@@ -150,7 +152,7 @@ impl Camera {
                             let color = world_ptr.color_at(&ray);
                             acc = acc + color;
                         }
-                        acc = acc * (1.0 / (NUM_SAMPLES as f64));
+                        acc = acc * (1.0 / (samples_per_pixel as f64));
                         // let gamma_corr = acc.sqrt();
                         write_pixel_fn_clone(row, col, Color::from_vec(acc));
                         bar_ptr.inc(1);
