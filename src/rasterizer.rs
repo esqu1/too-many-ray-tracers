@@ -1,7 +1,15 @@
 use crate::color::Color;
 use crate::ppm::PPM;
-use crate::vector::{Vec3f, Vec3i};
+use crate::vector::Vec3f;
 use std::collections::HashMap;
+
+// Coordinate System
+// .--------> (x)
+// |
+// |
+// |
+// |
+// v (y)
 
 pub fn interpolate(starting: f64, ending: f64, t: f64) -> f64 {
     ending * t + (1.0 - t) * starting
@@ -137,15 +145,8 @@ impl Rasterizer {
         }
     }
 
-    pub fn set_camera(&self, origin: Vec3f, lookat: Vec3f, up: Vec3f) {
+    #[allow(dead_code)]
+    pub fn set_camera(&self, _origin: Vec3f, _lookat: Vec3f, _up: Vec3f) {
         todo!();
     }
 }
-
-// Coordinate System
-// .--------> (x)
-// |
-// |
-// |
-// |
-// v (y)

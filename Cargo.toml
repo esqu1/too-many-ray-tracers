@@ -12,6 +12,8 @@ rand = "0.7.0"
 indicatif = "0.17.3"
 num-traits = "0.2"
 clap = { version = "4.5.35", features = ["derive"] }
+winit = "0.30.9"
+softbuffer = "0.4.6"
 
 [profile.release]
 debug = 1

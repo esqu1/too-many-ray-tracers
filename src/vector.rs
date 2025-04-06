@@ -11,7 +11,6 @@ pub struct Vector<T: Num + Copy> {
 }
 
 pub type Vec3f = Vector<f64>;
-pub type Vec3i = Vector<i32>;
 
 pub const ORIGIN: Vec3f = Vec3f {
     x: 0.0,

@@ -5,16 +5,19 @@ use crate::vector::Ray;
 use crate::vector::Vec3f;
 use indicatif::ProgressBar;
 use rand;
+use softbuffer::Buffer;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::thread::JoinHandle;
+use std::thread::ScopedJoinHandle;
+use winit::window::Window;
 
 const NUM_SAMPLES: usize = 100;
-const NUM_THREADS: usize = 6;
+const DEFAULT_NUM_THREADS: usize = 6;
 
 #[derive(Default, Debug)]
 pub struct Camera {
-    pub img: Arc<Mutex<PPM>>,
+    pub width: usize,
+    pub height: usize,
     // A point representing the camera origin.
     pub origin: Vec3f,
     // A vector representing dir that the camera is pointing.
@@ -22,8 +25,6 @@ pub struct Camera {
     // A vector representing the direction that is "up" within the plane of the camera.
     pub v_up: Vec3f,
     pub vfov: f64, // in degrees
-    pub focus_dist: f64,
-    pub aperture: f64,
 
     pub lower_left_corner: Vec3f,
     pub horizontal: Vec3f,
@@ -39,33 +40,24 @@ pub struct Camera {
 // Implements a camera view.
 impl Camera {
     pub fn new(
-        img: Arc<Mutex<PPM>>,
+        width: usize,
+        height: usize,
         origin: Vec3f,
         lookat: Vec3f,
         v_up: Vec3f,
         vfov: f64,
-        focus_dist: f64,
-        aperture: f64,
     ) -> Self {
         let mut camera = Self {
-            img,
+            width,
+            height,
             origin,
             lookat,
             v_up,
             vfov,
-            focus_dist,
-            aperture,
             ..Default::default()
         };
-        let length: usize;
-        let width: usize;
-        {
-            let img_lock = camera.img.lock().unwrap();
-            length = img_lock.get_length();
-            width = img_lock.get_width();
-        }
 
-        let aspect_ratio = width as f64 / length as f64;
+        let aspect_ratio = width as f64 / height as f64;
 
         let w = (&camera.origin - &camera.lookat).normalize();
         let u = camera.v_up.cross(&w).normalize();
@@ -84,60 +76,92 @@ impl Camera {
         camera
     }
 
-    pub fn write_ppm(&mut self, world: Arc<World>) {
-        let length: usize;
-        let width: usize;
-        {
-            let img_lock = self.img.lock().unwrap();
-            length = img_lock.get_length();
-            width = img_lock.get_width();
-        }
+    #[allow(dead_code)]
+    pub fn write_ppm(
+        &mut self,
+        world: Arc<World>,
+        num_threads: Option<usize>,
+        img: Arc<Mutex<PPM>>,
+    ) {
+        self.write(
+            world,
+            num_threads,
+            Arc::new(move |row: usize, col, color| {
+                img.lock().unwrap().set_pixel(color, row, col);
+            }),
+        );
+    }
 
-        let bar = Arc::new(ProgressBar::new(length as u64 * width as u64));
+    pub fn write_buffer(
+        &mut self,
+        world: Arc<World>,
+        num_threads: Option<usize>,
+        buffer: Arc<Mutex<Buffer<Arc<Window>, Arc<Window>>>>,
+    ) {
+        let buffer_clone = buffer.clone();
+        let width = self.width;
+        self.write(
+            world,
+            num_threads,
+            Arc::new(move |row: usize, col, color: Color| {
+                buffer_clone.lock().unwrap()[row * width + col] =
+                    color.blue as u32 | ((color.green as u32) << 8) | ((color.red as u32) << 16);
+            }),
+        );
+    }
 
-        let total_pixels = length * width;
+    fn write(
+        &self,
+        world: Arc<World>,
+        num_threads: Option<usize>,
+        write_pixel_fn: Arc<impl Fn(usize, usize, Color) + Send + Sync>,
+    ) {
+        let bar = Arc::new(ProgressBar::new(self.height as u64 * self.width as u64));
 
-        let mut handles: Vec<JoinHandle<()>> = vec![];
+        let total_pixels = self.height * self.width;
 
-        for i in 0..NUM_THREADS {
-            let origin = self.origin.clone();
-            let horizontal = self.horizontal.clone();
-            let vertical = self.vertical.clone();
-            let lower_left_corner = self.lower_left_corner.clone();
-            let img_ptr = self.img.clone();
-            let world_ptr = world.clone();
-            let bar_ptr = bar.clone();
-            handles.push(thread::spawn(move || {
-                let mut j = 0;
-                while j * NUM_THREADS + i < total_pixels {
-                    let pixel_val = j * NUM_THREADS + i;
-                    let row = pixel_val / width;
-                    let col = pixel_val % width;
-                    let mut acc = Vec3f::new(0.0, 0.0, 0.0);
-                    // sample multiple times for anti-aliasing
-                    for _ in 0..NUM_SAMPLES {
-                        let pass_through_camera_point = lower_left_corner.clone()
-                            + (&horizontal * ((col as f64 + rand::random::<f64>()) / width as f64))
-                            + &vertical * ((row as f64 + rand::random::<f64>()) / length as f64);
-                        let ray = Ray::from_pts(origin.clone(), pass_through_camera_point);
-                        let color = world_ptr.color_at(&ray);
-                        acc = acc + color;
+        thread::scope(|s| {
+            let mut handles: Vec<ScopedJoinHandle<()>> = vec![];
+            for i in 0..num_threads.unwrap_or(DEFAULT_NUM_THREADS) {
+                let origin = self.origin.clone();
+                let horizontal = self.horizontal.clone();
+                let vertical = self.vertical.clone();
+                let lower_left_corner = self.lower_left_corner.clone();
+                let world_ptr = world.clone();
+                let bar_ptr = bar.clone();
+                let write_pixel_fn_clone = write_pixel_fn.clone();
+                let width = self.width;
+                let height = self.height;
+                handles.push(s.spawn(move || {
+                    let mut j = 0;
+                    while j * DEFAULT_NUM_THREADS + i < total_pixels {
+                        let pixel_val = j * DEFAULT_NUM_THREADS + i;
+                        let row = pixel_val / width;
+                        let col = pixel_val % width;
+                        let mut acc = Vec3f::new(0.0, 0.0, 0.0);
+                        // sample multiple times for anti-aliasing
+                        for _ in 0..NUM_SAMPLES {
+                            let pass_through_camera_point = lower_left_corner.clone()
+                                + (&horizontal
+                                    * ((col as f64 + rand::random::<f64>()) / width as f64))
+                                + &vertical
+                                    * ((row as f64 + rand::random::<f64>()) / height as f64);
+                            let ray = Ray::from_pts(origin.clone(), pass_through_camera_point);
+                            let color = world_ptr.color_at(&ray);
+                            acc = acc + color;
+                        }
+                        acc = acc * (1.0 / (NUM_SAMPLES as f64));
+                        // let gamma_corr = acc.sqrt();
+                        write_pixel_fn_clone(row, col, Color::from_vec(acc));
+                        bar_ptr.inc(1);
+                        j += 1;
                     }
-                    acc = acc * (1.0 / (NUM_SAMPLES as f64));
-                    // let gamma_corr = acc.sqrt();
-                    img_ptr
-                        .lock()
-                        .unwrap()
-                        .set_pixel(Color::from_vec(acc), row, col);
+                }));
+            }
 
-                    bar_ptr.inc(1);
-                    j += 1;
-                }
-            }));
-        }
-
-        for handle in handles {
-            handle.join().unwrap();
-        }
+            for handle in handles {
+                handle.join().unwrap();
+            }
+        });
     }
 }

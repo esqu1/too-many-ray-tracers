@@ -12,13 +12,129 @@ use color::Color;
 use object::*;
 use ppm::PPM;
 use rasterizer::Rasterizer;
-use std::sync::{Arc, Mutex};
+use softbuffer::Surface;
+use std::{
+    num::NonZeroU32,
+    sync::{Arc, Mutex},
+};
 use vector::{Vec3f, ORIGIN};
+use winit::{
+    application::ApplicationHandler,
+    dpi::PhysicalSize,
+    event::{ElementState, KeyEvent, WindowEvent},
+    event_loop::{ActiveEventLoop, EventLoop},
+    keyboard::{Key, NamedKey},
+    window::{Window, WindowAttributes, WindowId},
+};
 
 #[derive(Parser)]
 struct Args {
     #[arg(short, long)]
     method: String,
+
+    #[arg(long)]
+    num_threads: Option<usize>,
+}
+
+struct App {
+    size: (usize, usize),
+    window: Option<Arc<Window>>,
+    surface: Option<Surface<Arc<Window>, Arc<Window>>>,
+    camera: Camera,
+    world: Arc<World>,
+    num_threads: Option<usize>,
+}
+
+impl App {
+    fn new(
+        size: (usize, usize),
+        camera: Camera,
+        world: Arc<World>,
+        num_threads: Option<usize>,
+    ) -> Self {
+        App {
+            size,
+            window: None,
+            surface: None,
+            camera,
+            world,
+            num_threads,
+        }
+    }
+}
+
+impl ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        let window = Arc::new(
+            event_loop
+                .create_window(
+                    WindowAttributes::default()
+                        .with_inner_size(PhysicalSize::new(self.size.0 as u32, self.size.1 as u32)),
+                )
+                .unwrap(),
+        );
+        self.window = Some(window.clone());
+        let context = softbuffer::Context::new(window.clone()).unwrap();
+        self.surface = Some(softbuffer::Surface::new(&context, window.clone()).unwrap());
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        match event {
+            WindowEvent::CloseRequested => {
+                event_loop.exit();
+            }
+            WindowEvent::RedrawRequested => {
+                let Some(ref mut surface) = self.surface else {
+                    eprintln!("RedrawRequested fired before Resumed or after Suspended");
+                    return;
+                };
+                let Some(ref mut window) = self.window else {
+                    eprintln!("RedrawRequested fired before Resumed or after Suspended");
+                    return;
+                };
+
+                let (width, height) = {
+                    let size = window.inner_size();
+                    println!("{:?}", size);
+                    (size.width, size.height)
+                };
+
+                surface
+                    .resize(
+                        NonZeroU32::new(width).unwrap(),
+                        NonZeroU32::new(height).unwrap(),
+                    )
+                    .unwrap();
+
+                let buffer = Arc::new(Mutex::new(surface.buffer_mut().unwrap()));
+
+                self.camera
+                    .write_buffer(self.world.clone(), self.num_threads, buffer.clone());
+
+                match Arc::try_unwrap(buffer) {
+                    Ok(mutex) => mutex.into_inner().unwrap().present().unwrap(),
+                    Err(_) => println!("Failed to unwrap buffer"),
+                }
+            }
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        state: ElementState::Pressed,
+                        logical_key: Key::Named(NamedKey::Escape),
+                        ..
+                    },
+                ..
+            } => {
+                event_loop.exit();
+            }
+            _ => {}
+        }
+    }
 }
 
 fn rasterize() {
@@ -44,26 +160,22 @@ fn rasterize() {
 
     rasterizer.write_to_ppm(&mut ppm);
 
-    ppm.write_to_file(String::from("rasterized.ppm"));
+    ppm.write_to_file(String::from("rasterized.ppm")).unwrap();
 }
 
-fn raytrace() {
+fn raytrace(num_threads: Option<usize>) {
     let aspect_ratio = 16.0 / 9.0;
-    let img_length = 450;
+    let img_height = 450;
+    let img_width = (img_height as f64 * aspect_ratio) as usize;
     let origin = Vec3f::new(13.0, 2.0, 3.0);
     let lookat = ORIGIN;
-    let focus_dist = 10.0;
-    let mut camera = Camera::new(
-        Arc::new(Mutex::new(PPM::new(
-            img_length,
-            (img_length as f64 * aspect_ratio) as usize,
-        ))),
+    let camera = Camera::new(
+        (img_height as f64 * aspect_ratio) as usize,
+        img_height,
         origin,
         lookat,
         Vec3f::new(0.0, -1.0, 0.0),
         40.0,
-        focus_dist,
-        2.0,
     );
 
     let mut objects: Vec<Object> = vec![];
@@ -135,24 +247,17 @@ fn raytrace() {
             fuzz: 0.0,
         }),
     });
-
     let world = Arc::new(World { objects });
 
-    camera.write_ppm(world);
-
-    // let gradient_ppm = draw_gradient(1080, 1920);
-    camera
-        .img
-        .lock()
-        .unwrap()
-        .write_to_file(String::from("test.ppm"))
-        .expect("I/O error during write");
+    let event_loop: EventLoop<()> = EventLoop::new().unwrap();
+    let mut app = App::new((img_width, img_height), camera, world, num_threads);
+    event_loop.run_app(&mut app).unwrap();
 }
 
 fn main() {
     let args = Args::parse();
     match args.method.as_str() {
-        "raytracer" => raytrace(),
+        "raytracer" => raytrace(args.num_threads),
         "rasterizer" => rasterize(),
         _ => println!("Unknown method provided. Available options are raytracer and rasterizer."),
     }
