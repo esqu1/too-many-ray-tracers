@@ -14,6 +14,9 @@ num-traits = "0.2"
 clap = { version = "4.5.35", features = ["derive"] }
 winit = "0.30.9"
 softbuffer = "0.4.6"
+egui-winit = "0.31.1"
+egui = "0.31.1"
+egui-wgpu = "0.31.1"
 
 [profile.release]
 debug = 1

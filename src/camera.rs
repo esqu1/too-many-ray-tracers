@@ -3,13 +3,13 @@ use crate::object::*;
 use crate::ppm::PPM;
 use crate::vector::Ray;
 use crate::vector::Vec3f;
+use egui_winit::winit::window::Window;
 use indicatif::ProgressBar;
 use rand;
 use softbuffer::Buffer;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::ScopedJoinHandle;
-use winit::window::Window;
 
 const DEFAULT_NUM_THREADS: usize = 6;
 

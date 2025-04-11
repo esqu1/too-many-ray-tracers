@@ -9,6 +9,16 @@ mod vector;
 use camera::Camera;
 use clap::Parser;
 use color::Color;
+use egui::{Align, Align2, Context, Shadow, Visuals};
+use egui_winit::winit::{
+    application::ApplicationHandler,
+    dpi::PhysicalSize,
+    event::{ElementState, KeyEvent, WindowEvent},
+    event_loop::{ActiveEventLoop, EventLoop},
+    keyboard::{Key, NamedKey},
+    window::{Window, WindowAttributes, WindowId},
+};
+use egui_winit::State;
 use object::*;
 use ppm::PPM;
 use rasterizer::Rasterizer;
@@ -18,14 +28,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 use vector::{Vec3f, ORIGIN};
-use winit::{
-    application::ApplicationHandler,
-    dpi::PhysicalSize,
-    event::{ElementState, KeyEvent, WindowEvent},
-    event_loop::{ActiveEventLoop, EventLoop},
-    keyboard::{Key, NamedKey},
-    window::{Window, WindowAttributes, WindowId},
-};
 
 #[derive(Parser)]
 struct Args {
@@ -49,6 +51,8 @@ struct App {
     camera: Camera,
     world: Arc<World>,
     num_threads: Option<usize>,
+    egui_ctx: Context,
+    egui_state: Option<State>,
 }
 
 impl App {
@@ -58,6 +62,13 @@ impl App {
         world: Arc<World>,
         num_threads: Option<usize>,
     ) -> Self {
+        let visuals = Visuals {
+            window_shadow: Shadow::NONE,
+            ..Default::default()
+        };
+
+        let egui_context = Context::default();
+        egui_context.set_visuals(visuals);
         App {
             size,
             window: None,
@@ -65,6 +76,8 @@ impl App {
             camera,
             world,
             num_threads,
+            egui_ctx: egui_context,
+            egui_state: None,
         }
     }
 }
@@ -82,6 +95,15 @@ impl ApplicationHandler for App {
         self.window = Some(window.clone());
         let context = softbuffer::Context::new(window.clone()).unwrap();
         self.surface = Some(softbuffer::Surface::new(&context, window.clone()).unwrap());
+
+        self.egui_state = Some(State::new(
+            self.egui_ctx.clone(),
+            self.egui_ctx.viewport_id(),
+            &window,
+            None,
+            None,
+            None,
+        ));
     }
 
     fn window_event(
@@ -106,8 +128,12 @@ impl ApplicationHandler for App {
 
                 let (width, height) = {
                     let size = window.inner_size();
-                    println!("{:?}", size);
                     (size.width, size.height)
+                };
+
+                let Some(ref mut egui_state) = self.egui_state else {
+                    eprintln!("RedrawRequested fired before Resumed or after Suspended");
+                    return;
                 };
 
                 surface
@@ -122,10 +148,40 @@ impl ApplicationHandler for App {
                 self.camera
                     .write_buffer(self.world.clone(), self.num_threads, buffer.clone());
 
+                let raw_input = egui_state.take_egui_input(&window);
+                println!("{:?}", raw_input);
+
+                let full_output = self.egui_ctx.run(raw_input, |ui| {
+                    let x = egui::Window::new("Hello")
+                        .default_open(true)
+                        .max_width(1000.0)
+                        .max_height(800.0)
+                        .default_width(800.0)
+                        .resizable(true)
+                        .anchor(Align2::LEFT_TOP, [0.0, 0.0])
+                        .show(&ui, |mut ui| {
+                            println!("Hello, world!");
+                            if ui.add(egui::Button::new("Click me")).clicked() {
+                                println!("PRESSED")
+                            }
+
+                            ui.label("Slider");
+                            // ui.add(egui::Slider::new(_, 0..=120).text("age"));
+                            ui.end_row();
+                        });
+                    println!("{:?}", x);
+                });
+
+                egui_state.handle_platform_output(&window, full_output.platform_output);
+
+                // let triangles = self
+                //     .egui_ctx
+                //     .tessellate(full_output.shapes, full_output.pixels_per_point);
+
                 match Arc::try_unwrap(buffer) {
                     Ok(mutex) => mutex.into_inner().unwrap().present().unwrap(),
                     Err(_) => println!("Failed to unwrap buffer"),
-                }
+                };
             }
             WindowEvent::KeyboardInput {
                 event:
@@ -139,6 +195,13 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             _ => {}
+        }
+        if let Some(ref mut egui_state) = self.egui_state {
+            let Some(ref mut window) = self.window else {
+                eprintln!("Window not found");
+                return;
+            };
+            let _ = egui_state.on_window_event(window, &event);
         }
     }
 }
